@@ -6,4 +6,5 @@ Documenting my path through Docker and DevOps as part of my Reminder
 - [02 - ADD Remote vs COPY Local](./02-add-remote-vs-copy-local/README.md)
 - [03 - Building an Image](./03-building-an-image/README.md)
 - [04 - Tagging and Pushing](./04-tagging-and-pushing/README.md)
+- [05 - cmd-usage](./05-cmd-usage/README.md)
 - more coming...
