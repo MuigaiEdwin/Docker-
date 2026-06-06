@@ -131,7 +131,7 @@
       status.className = "status waiting";
 
       try {
-        const res = await fetch("http://api:5000/info");
+        const res = await fetch("/api/info");
         const data = await res.json();
 
         document.getElementById("env").textContent      = data.env;
