@@ -1,19 +1,24 @@
-# devportal
+# DevPortal
 
-A two-service containerized project built to practice advanced Docker concepts. There's a Python/Flask API that returns live system info and an Nginx dashboard that talks to it — all wired together with Docker Compose.
- 
-This project picks up where single-container practice left off.How real applications work in Docker: multiple services, a shared network, data that survives restarts, and containers that wait for each other before starting.
+A two-service containerized app — a Python/Flask API serving live system stats, fronted by an Nginx reverse proxy. Built to understand how real multi-container applications work in Docker.
 
 ---
 
-## What I've learnt: 
+## The Problem
 
-- Multi-stage Docker builds and why they matter for image size
-- How containers on the same network find each other by name
-- Health checks — letting Docker know when a service is actually ready
-- Named volumes for data that persists across container restarts
-- Environment variables as the clean way to configure containers
-- Docker Compose as the tool that ties everything together
+Single-container practice only gets you so far. Real apps have multiple services that need to communicate, share data, and start in the right order. This project solves that by wiring two containers together using Docker Compose.
+
+---
+
+## How it works
+
+```
+Browser → localhost:8080 → Nginx (dashboard) → Flask API (port 5000)
+```
+
+Both services run on a private Docker network (`devnet`). Nginx proxies `/api/` requests to the Flask container — the browser never talks to the API directly. Logs are written to a named volume so they survive container restarts.
+
+![Architecture](./images/architechture.png)
 
 ---
 
@@ -28,141 +33,43 @@ devportal/
 │   └── requirements.txt
 └── dashboard/
     ├── Dockerfile
+    ├── nginx.conf
     └── index.html
 ```
 
-![architechture](./architechture.png)
 ---
 
-## How it works
-
-The two services live on a private Docker network called `devnet`. Because they share that network, the dashboard can reach the API by just typing `http://api:5000` — Docker handles the DNS lookup internally. Your browser on the host machine only ever talks to the dashboard, which is the only service with an exposed port.
-
-```
-Your browser → localhost:8080 → dashboard container → api container (port 5000)
-```
-
-The API also writes to a named volume (`api-logs`) so anything it logs survives even if you tear the container down and bring it back up.
-
----
-
-## Prerequisites
-
-- Docker Desktop (or Docker Engine + Compose plugin on Linux)
-- That's it — no Python or Nginx needed on your machine
-
----
-
-## Running the project
-
-Clone the repo and start everything with one command:
+## Run it
 
 ```bash
-git clone https://github.com/muigaiedwin/devportal.git
-cd devportal
+git clone https://github.com/MuigaiEdwin/Docker-.git
+cd Project/devportal
 docker compose up --build
 ```
 
-The `--build` flag makes sure Docker rebuilds both images from scratch. You'll see both services start in the terminal — the dashboard will wait until the API passes its health check before it comes up.
+Open `http://localhost:8080` and click **Fetch system info**.
 
-Once everything is running, open `http://localhost:8080` in your browser and press the button.
-
-To run it in the background instead:
-
-```bash
-docker compose up --build -d
-```
+![Running state](./images/running.png)
+![Live output](./images/live_output.png)
+![Health checks](./images/checks.png)
 
 ---
 
-## Stopping and cleaning up
+## What I learnt
 
-Stop everything and remove the containers and network:
-
-```bash
-docker compose down
-```
-
-If you also want to delete the log volume (the persisted data):
-
-```bash
-docker compose down -v
-```
-
-To remove the built images too:
-
-```bash
-docker rmi devportal-api devportal-dashboard
-```
+- Multi-stage builds to keep image sizes small
+- Container DNS — services find each other by name on a shared network
+- Health checks so Compose waits for the API to be ready before starting the dashboard
+- Named volumes for data that persists across restarts
+- Nginx as a reverse proxy between the browser and the API
+- Environment variables for runtime configuration without touching the image
 
 ---
 
-## Things worth exploring
-
-**Override environment variables at runtime**
-
-The API reads `APP_ENV` and `PORT` from its environment. You can override them without touching the image:
+## Cleanup
 
 ```bash
-docker run --rm -e APP_ENV=staging -e PORT=5001 -p 5001:5001 devportal-api
+docker compose down        # stop and remove containers
+docker compose down -v     # also delete the log volume
+docker rmi devportal-api devportal-dashboard  # remove images
 ```
-
-Then hit `http://localhost:5001/info` and you'll see `"env": "staging"` in the response.
-
-**Inspect the Docker network**
-
-```bash
-docker network ls
-docker network inspect devportal_devnet
-```
-
-This shows you both containers, their internal IP addresses, and how Docker connected them.
-
-**Inspect the volume**
-
-```bash
-docker volume ls
-docker volume inspect devportal_api-logs
-```
-
-The `Mountpoint` field tells you exactly where Docker is storing the data on your machine.
-
-**Check container health**
-
-```bash
-docker ps
-```
-
-Look at the `STATUS` column. The API will show `(healthy)` once it passes its first health check. If something breaks, it shows `(unhealthy)` — no need to exec into the container to know something is wrong.
-
-**Scale the API**
-
-First remove the `container_name: api` line from `docker-compose.yml` (static names block scaling), then:
-
-```bash
-docker compose up --scale api=3 -d
-```
-
-This spins up three replicas of the API service.
-
----
-
-## Concepts explained
-
-### Multi-stage builds
-
-The API Dockerfile has two `FROM` statements. The first stage (called `builder`) installs all the Python dependencies. The second stage copies only the installed packages from that first stage and discards everything else — no pip cache, no build tools, no temp files. The result is a noticeably smaller final image.
-
-### Health checks
-
-The `HEALTHCHECK` instruction in the Dockerfile tells Docker to periodically run a command against the running container. If it fails three times in a row, Docker marks the container as `unhealthy`. Compose uses this status with `depends_on: condition: service_healthy` to hold the dashboard back until the API is genuinely ready — not just started, but actually responding.
-
-### Named volumes
-
-A named volume like `api-logs` is managed by Docker, not tied to a specific path on your machine. The data inside it survives `docker compose down`. You have to explicitly pass `-v` to delete it. This is how you'd handle a database in a containerized setup.
-
-### Docker networking and DNS
-
-When you put two services on the same Compose network, Docker registers each container's name as a DNS hostname on that network. So `http://api:5000` works inside the dashboard container the same way `http://google.com` works in your browser — Docker resolves the name `api` to the right internal IP automatically.
-
----
