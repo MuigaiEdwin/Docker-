@@ -1,0 +1,39 @@
+version: "3.9"
+
+services:
+
+  api:
+    build: ./api
+    image: devportal-api
+    container_name: api
+    environment:
+      - APP_ENV=production
+      - PORT=5000
+    volumes:
+      - api-logs:/app/logs
+    networks:
+      - devnet
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:5000/health')\""]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  dashboard:
+    build: ./dashboard
+    image: devportal-dashboard
+    container_name: dashboard
+    ports:
+      - "8080:80"
+    networks:
+      - devnet
+    depends_on:
+      api:
+        condition: service_healthy
+
+volumes:
+  api-logs:
+
+networks:
+  devnet:
+    driver: bridge
